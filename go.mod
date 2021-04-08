@@ -1,5 +1,4 @@
-module hack-browser-data
-
+module github.com/pedramn/hackbrowserdata
 go 1.14
 
 require (
