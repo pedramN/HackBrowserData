@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/base64"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+
 
 	"hack-browser-data/core/decrypt"
 	"hack-browser-data/log"
@@ -34,6 +37,7 @@ type Item interface {
 
 	// Release is delete item db file
 	Release() error
+
 }
 
 const (
@@ -54,11 +58,11 @@ var (
 	queryChromiumLogin    = `SELECT origin_url, username_value, password_value, date_created FROM logins`
 	queryChromiumHistory  = `SELECT url, title, visit_count, last_visit_time FROM urls`
 	queryChromiumDownload = `SELECT target_path, tab_url, total_bytes, start_time, end_time, mime_type FROM downloads`
-	queryChromiumCookie   = `SELECT name, encrypted_value, host_key, path, creation_utc, expires_utc, is_secure, is_httponly, has_expires, is_persistent FROM cookies`
+	queryChromiumCookie   = `SELECT name, encrypted_value, host_key, path, creation_utc, expires_utc, is_secure, is_httponly, has_expires, is_persistent, samesite FROM cookies`
 	queryFirefoxHistory   = `SELECT id, url, last_visit_date, title, visit_count FROM moz_places`
 	queryFirefoxDownload  = `SELECT place_id, GROUP_CONCAT(content), url, dateAdded FROM (SELECT * FROM moz_annos INNER JOIN moz_places ON moz_annos.place_id=moz_places.id) t GROUP BY place_id`
 	queryFirefoxBookMarks = `SELECT id, fk, type, dateAdded, title FROM moz_bookmarks`
-	queryFirefoxCookie    = `SELECT name, value, host, path, creationTime, expiry, isSecure, isHttpOnly FROM moz_cookies`
+	queryFirefoxCookie    = `SELECT name, value, host, path, creationTime, expiry, isSecure, isHttpOnly, sameSite FROM moz_cookies`
 	queryMetaData         = `SELECT item1, item2 FROM metaData WHERE id = 'password'`
 	queryNssPrivate       = `SELECT a11, a102 from nssPrivate`
 	closeJournalMode      = `PRAGMA journal_mode=off`
@@ -73,16 +77,16 @@ const (
 	bookmarkChildren = "children"
 )
 
-type bookmarks struct {
+type Bookmarks struct {
 	mainPath  string
-	bookmarks []bookmark
+	Bookmarks []bookmark
 }
 
 func NewBookmarks(main, sub string) Item {
-	return &bookmarks{mainPath: main}
+	return &Bookmarks{mainPath: main}
 }
 
-func (b *bookmarks) ChromeParse(key []byte) error {
+func (b *Bookmarks) ChromeParse(key []byte) error {
 	bookmarks, err := utils.ReadFile(ChromeBookmarkFile)
 	if err != nil {
 		return err
@@ -98,7 +102,7 @@ func (b *bookmarks) ChromeParse(key []byte) error {
 	return nil
 }
 
-func getBookmarkChildren(value gjson.Result, b *bookmarks) (children gjson.Result) {
+func getBookmarkChildren(value gjson.Result, b *Bookmarks) (children gjson.Result) {
 	nodeType := value.Get(bookmarkType)
 	bm := bookmark{
 		ID:        value.Get(bookmarkID).Int(),
@@ -109,7 +113,7 @@ func getBookmarkChildren(value gjson.Result, b *bookmarks) (children gjson.Resul
 	children = value.Get(bookmarkChildren)
 	if nodeType.Exists() {
 		bm.Type = nodeType.String()
-		b.bookmarks = append(b.bookmarks, bm)
+		b.Bookmarks = append(b.Bookmarks, bm)
 		if children.Exists() && children.IsArray() {
 			for _, v := range children.Array() {
 				children = getBookmarkChildren(v, b)
@@ -119,7 +123,7 @@ func getBookmarkChildren(value gjson.Result, b *bookmarks) (children gjson.Resul
 	return children
 }
 
-func (b *bookmarks) FirefoxParse() error {
+func (b *Bookmarks) FirefoxParse() error {
 	var (
 		err          error
 		keyDB        *sql.DB
@@ -156,7 +160,7 @@ func (b *bookmarks) FirefoxParse() error {
 		if url, ok := tempMap[id]; ok {
 			bookmarkUrl = url
 		}
-		b.bookmarks = append(b.bookmarks, bookmark{
+		b.Bookmarks = append(b.Bookmarks, bookmark{
 			ID:        id,
 			Name:      title,
 			Type:      utils.BookMarkType(bType),
@@ -167,17 +171,17 @@ func (b *bookmarks) FirefoxParse() error {
 	return nil
 }
 
-func (b *bookmarks) CopyDB() error {
+func (b *Bookmarks) CopyDB() error {
 	return copyToLocalPath(b.mainPath, filepath.Base(b.mainPath))
 }
 
-func (b *bookmarks) Release() error {
+func (b *Bookmarks) Release() error {
 	return os.Remove(filepath.Base(b.mainPath))
 }
 
-func (b *bookmarks) OutPut(format, browser, dir string) error {
-	sort.Slice(b.bookmarks, func(i, j int) bool {
-		return b.bookmarks[i].ID < b.bookmarks[j].ID
+func (b *Bookmarks) OutPut(format, browser, dir string) error {
+	sort.Slice(b.Bookmarks, func(i, j int) bool {
+		return b.Bookmarks[i].ID < b.Bookmarks[j].ID
 	})
 	switch format {
 	case "csv":
@@ -192,17 +196,17 @@ func (b *bookmarks) OutPut(format, browser, dir string) error {
 	}
 }
 
-type cookies struct {
+type Cookies struct {
 	mainPath string
-	cookies  map[string][]cookie
+	Cookies  map[string][]cookie
 }
 
 func NewCookies(main, sub string) Item {
-	return &cookies{mainPath: main}
+	return &Cookies{mainPath: main}
 }
+func (c *Cookies) ChromeParse(secretKey []byte) error {
 
-func (c *cookies) ChromeParse(secretKey []byte) error {
-	c.cookies = make(map[string][]cookie)
+	c.Cookies = make(map[string][]cookie)
 	cookieDB, err := sql.Open("sqlite3", ChromeCookieFile)
 	if err != nil {
 		return err
@@ -225,10 +229,10 @@ func (c *cookies) ChromeParse(secretKey []byte) error {
 		var (
 			key, host, path                               string
 			isSecure, isHTTPOnly, hasExpire, isPersistent int
-			createDate, expireDate                        int64
+			createDate, expireDate, samesite              int64
 			value, encryptValue                           []byte
 		)
-		err = rows.Scan(&key, &encryptValue, &host, &path, &createDate, &expireDate, &isSecure, &isHTTPOnly, &hasExpire, &isPersistent)
+		err = rows.Scan(&key, &encryptValue, &host, &path, &createDate, &expireDate, &isSecure, &isHTTPOnly, &hasExpire, &isPersistent, &samesite)
 		if err != nil {
 			log.Error(err)
 		}
@@ -236,6 +240,7 @@ func (c *cookies) ChromeParse(secretKey []byte) error {
 			KeyName:      key,
 			Host:         host,
 			Path:         path,
+			SameSite:     samesite,
 			encryptValue: encryptValue,
 			IsSecure:     utils.IntToBool(isSecure),
 			IsHTTPOnly:   utils.IntToBool(isHTTPOnly),
@@ -251,16 +256,16 @@ func (c *cookies) ChromeParse(secretKey []byte) error {
 			value, err = decrypt.ChromePass(secretKey, encryptValue)
 		}
 		if err != nil {
-			log.Debug(err)
+			//log.Debug(err)
 		}
 		cookie.Value = string(value)
-		c.cookies[host] = append(c.cookies[host], cookie)
+		c.Cookies[host] = append(c.Cookies[host], cookie)
 	}
 	return nil
 }
 
-func (c *cookies) FirefoxParse() error {
-	c.cookies = make(map[string][]cookie)
+func (c *Cookies) FirefoxParse() error {
+	c.Cookies = make(map[string][]cookie)
 	cookieDB, err := sql.Open("sqlite3", FirefoxCookieFile)
 	if err != nil {
 		return err
@@ -283,16 +288,17 @@ func (c *cookies) FirefoxParse() error {
 		var (
 			name, value, host, path string
 			isSecure, isHttpOnly    int
-			creationTime, expiry    int64
+			creationTime, expiry, sameSite    int64
 		)
-		err = rows.Scan(&name, &value, &host, &path, &creationTime, &expiry, &isSecure, &isHttpOnly)
+		err = rows.Scan(&name, &value, &host, &path, &creationTime, &expiry, &isSecure, &isHttpOnly, &sameSite)
 		if err != nil {
 			log.Error(err)
 		}
-		c.cookies[host] = append(c.cookies[host], cookie{
+		c.Cookies[host] = append(c.Cookies[host], cookie{
 			KeyName:    name,
 			Host:       host,
 			Path:       path,
+			SameSite:   sameSite,
 			IsSecure:   utils.IntToBool(isSecure),
 			IsHTTPOnly: utils.IntToBool(isHttpOnly),
 			CreateDate: utils.TimeStampFormat(creationTime / 1000000),
@@ -303,15 +309,15 @@ func (c *cookies) FirefoxParse() error {
 	return nil
 }
 
-func (c *cookies) CopyDB() error {
+func (c *Cookies) CopyDB() error {
 	return copyToLocalPath(c.mainPath, filepath.Base(c.mainPath))
 }
 
-func (c *cookies) Release() error {
+func (c *Cookies) Release() error {
 	return os.Remove(filepath.Base(c.mainPath))
 }
 
-func (c *cookies) OutPut(format, browser, dir string) error {
+func (c *Cookies) OutPut(format, browser, dir string) error {
 	switch format {
 	case "csv":
 		err := c.outPutCsv(browser, dir)
@@ -325,16 +331,16 @@ func (c *cookies) OutPut(format, browser, dir string) error {
 	}
 }
 
-type historyData struct {
+type HistoryData struct {
 	mainPath string
-	history  []history
+	History  []history
 }
 
 func NewHistoryData(main, sub string) Item {
-	return &historyData{mainPath: main}
+	return &HistoryData{mainPath: main}
 }
 
-func (h *historyData) ChromeParse(key []byte) error {
+func (h *HistoryData) ChromeParse(key []byte) error {
 	historyDB, err := sql.Open("sqlite3", ChromeHistoryFile)
 	if err != nil {
 		return err
@@ -369,12 +375,12 @@ func (h *historyData) ChromeParse(key []byte) error {
 		if err != nil {
 			log.Error(err)
 		}
-		h.history = append(h.history, data)
+		h.History = append(h.History, data)
 	}
 	return nil
 }
 
-func (h *historyData) FirefoxParse() error {
+func (h *HistoryData) FirefoxParse() error {
 	var (
 		err         error
 		keyDB       *sql.DB
@@ -415,7 +421,7 @@ func (h *historyData) FirefoxParse() error {
 		if err != nil {
 			log.Warn(err)
 		}
-		h.history = append(h.history, history{
+		h.History = append(h.History, history{
 			Title:         title,
 			Url:           url,
 			VisitCount:    visitCount,
@@ -426,17 +432,17 @@ func (h *historyData) FirefoxParse() error {
 	return nil
 }
 
-func (h *historyData) CopyDB() error {
+func (h *HistoryData) CopyDB() error {
 	return copyToLocalPath(h.mainPath, filepath.Base(h.mainPath))
 }
 
-func (h *historyData) Release() error {
+func (h *HistoryData) Release() error {
 	return os.Remove(filepath.Base(h.mainPath))
 }
 
-func (h *historyData) OutPut(format, browser, dir string) error {
-	sort.Slice(h.history, func(i, j int) bool {
-		return h.history[i].VisitCount > h.history[j].VisitCount
+func (h *HistoryData) OutPut(format, browser, dir string) error {
+	sort.Slice(h.History, func(i, j int) bool {
+		return h.History[i].VisitCount > h.History[j].VisitCount
 	})
 	switch format {
 	case "csv":
@@ -636,7 +642,7 @@ func (p *passwords) ChromeParse(key []byte) error {
 			password, err = decrypt.ChromePass(key, pwd)
 		}
 		if err != nil {
-			log.Debugf("%s have empty password %s", login.LoginUrl, err.Error())
+			//log.Debugf("%s have empty password %s", login.LoginUrl, err.Error())
 		}
 		if create > time.Now().Unix() {
 			login.CreateDate = utils.TimeEpochFormat(create)
@@ -923,30 +929,31 @@ type (
 		CreateDate  time.Time
 	}
 	bookmark struct {
-		ID        int64
-		Name      string
-		Type      string
-		URL       string
-		DateAdded time.Time
+		ID        int64   `json:"id"`
+		Name      string   `json:"name"`
+		Type      string    `json:"type"`
+		URL       string     `json:"url"`
+		DateAdded time.Time   `json:"date_added"`
 	}
 	cookie struct {
-		Host         string
-		Path         string
-		KeyName      string
-		encryptValue []byte
-		Value        string
-		IsSecure     bool
-		IsHTTPOnly   bool
-		HasExpire    bool
-		IsPersistent bool
-		CreateDate   time.Time
-		ExpireDate   time.Time
+		Host         string   `json:"host_key"`
+		Path         string   `json:"path"`
+		KeyName      string    `json:"name"`
+		SameSite     int64    `json:"same_site"`
+		encryptValue []byte    `json:"encrypt_value"`
+		Value        string    `json:"value"`
+		IsSecure     bool       `json:"is_secure"`
+		IsHTTPOnly   bool       `json:"is_httponly"`
+		HasExpire    bool       `json:"has_expires"`
+		IsPersistent bool      `json:"is_persistant"`
+		CreateDate   time.Time   `json:"create_date"`
+		ExpireDate   time.Time   `json:"expire_date"`
 	}
 	history struct {
-		Title         string
-		Url           string
-		VisitCount    int
-		LastVisitTime time.Time
+		Title         string   `json:"title"`
+		Url           string   `json:"url"`
+		VisitCount    int       `json:"visit_count"`
+		LastVisitTime time.Time  `json:"last_visit_time"`
 	}
 	download struct {
 		TargetPath string
@@ -966,6 +973,7 @@ type (
 )
 
 func (p passwords) Len() int {
+	fmt.Println("Hello World")
 	return len(p.logins)
 }
 

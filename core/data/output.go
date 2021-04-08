@@ -16,29 +16,29 @@ var (
 	utf8Bom = []byte{239, 187, 191}
 )
 
-func (b *bookmarks) outPutJson(browser, dir string) error {
+func (b *Bookmarks) outPutJson(browser, dir string) error {
 	filename := utils.FormatFileName(dir, browser, "bookmark", "json")
-	sort.Slice(b.bookmarks, func(i, j int) bool {
-		return b.bookmarks[i].ID < b.bookmarks[j].ID
+	sort.Slice(b.Bookmarks, func(i, j int) bool {
+		return b.Bookmarks[i].ID < b.Bookmarks[j].ID
 	})
-	err := writeToJson(filename, b.bookmarks)
+	err := writeToJson(filename, b.Bookmarks)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s Get %d bookmarks, filename is %s \n", utils.Prefix, len(b.bookmarks), filename)
+	fmt.Printf("%s Get %d Bookmarks, filename is %s \n", utils.Prefix, len(b.Bookmarks), filename)
 	return nil
 }
 
-func (h *historyData) outPutJson(browser, dir string) error {
+func (h *HistoryData) outPutJson(browser, dir string) error {
 	filename := utils.FormatFileName(dir, browser, "history", "json")
-	sort.Slice(h.history, func(i, j int) bool {
-		return h.history[i].VisitCount > h.history[j].VisitCount
+	sort.Slice(h.History, func(i, j int) bool {
+		return h.History[i].VisitCount > h.History[j].VisitCount
 	})
-	err := writeToJson(filename, h.history)
+	err := writeToJson(filename, h.History)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s Get %d history, filename is %s \n", utils.Prefix, len(h.history), filename)
+	fmt.Printf("%s Get %d history, filename is %s \n", utils.Prefix, len(h.History), filename)
 	return nil
 }
 
@@ -62,13 +62,13 @@ func (p *passwords) outPutJson(browser, dir string) error {
 	return nil
 }
 
-func (c *cookies) outPutJson(browser, dir string) error {
+func (c *Cookies) outPutJson(browser, dir string) error {
 	filename := utils.FormatFileName(dir, browser, "cookie", "json")
-	err := writeToJson(filename, c.cookies)
+	err := writeToJson(filename, c.Cookies)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s Get %d cookies, filename is %s \n", utils.Prefix, len(c.cookies), filename)
+	fmt.Printf("%s Get %d cookies, filename is %s \n", utils.Prefix, len(c.Cookies), filename)
 	return nil
 }
 
@@ -103,21 +103,21 @@ func writeToJson(filename string, data interface{}) error {
 	return nil
 }
 
-func (b *bookmarks) outPutCsv(browser, dir string) error {
+func (b *Bookmarks) outPutCsv(browser, dir string) error {
 	filename := utils.FormatFileName(dir, browser, "bookmark", "csv")
-	if err := writeToCsv(filename, b.bookmarks); err != nil {
+	if err := writeToCsv(filename, b.Bookmarks); err != nil {
 		return err
 	}
-	fmt.Printf("%s Get %d bookmarks, filename is %s \n", utils.Prefix, len(b.bookmarks), filename)
+	fmt.Printf("%s Get %d Bookmarks, filename is %s \n", utils.Prefix, len(b.Bookmarks), filename)
 	return nil
 }
 
-func (h *historyData) outPutCsv(browser, dir string) error {
+func (h *HistoryData) outPutCsv(browser, dir string) error {
 	filename := utils.FormatFileName(dir, browser, "history", "csv")
-	if err := writeToCsv(filename, h.history); err != nil {
+	if err := writeToCsv(filename, h.History); err != nil {
 		return err
 	}
-	fmt.Printf("%s Get %d history, filename is %s \n", utils.Prefix, len(h.history), filename)
+	fmt.Printf("%s Get %d history, filename is %s \n", utils.Prefix, len(h.History), filename)
 	return nil
 }
 
@@ -139,16 +139,16 @@ func (p *passwords) outPutCsv(browser, dir string) error {
 	return nil
 }
 
-func (c *cookies) outPutCsv(browser, dir string) error {
+func (c *Cookies) outPutCsv(browser, dir string) error {
 	filename := utils.FormatFileName(dir, browser, "cookie", "csv")
 	var tempSlice []cookie
-	for _, v := range c.cookies {
+	for _, v := range c.Cookies {
 		tempSlice = append(tempSlice, v...)
 	}
 	if err := writeToCsv(filename, tempSlice); err != nil {
 		return err
 	}
-	fmt.Printf("%s Get %d cookies, filename is %s \n", utils.Prefix, len(c.cookies), filename)
+	fmt.Printf("%s Get %d cookies, filename is %s \n", utils.Prefix, len(c.Cookies), filename)
 	return nil
 }
 
@@ -187,20 +187,20 @@ func writeToCsv(filename string, data interface{}) error {
 	return nil
 }
 
-func (b *bookmarks) outPutConsole() {
-	for _, v := range b.bookmarks {
+func (b *Bookmarks) outPutConsole() {
+	for _, v := range b.Bookmarks {
 		fmt.Printf("%+v\n", v)
 	}
 }
 
-func (c *cookies) outPutConsole() {
-	for host, value := range c.cookies {
+func (c *Cookies) outPutConsole() {
+	for host, value := range c.Cookies {
 		fmt.Printf("%s\n%+v\n", host, value)
 	}
 }
 
-func (h *historyData) outPutConsole() {
-	for _, v := range h.history {
+func (h *HistoryData) outPutConsole() {
+	for _, v := range h.History {
 		fmt.Printf("%+v\n", v)
 	}
 }

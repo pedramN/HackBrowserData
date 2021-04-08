@@ -39,24 +39,24 @@ type Browser interface {
 	// GetSecretKey return browser secret key
 	GetSecretKey() []byte
 
-	// GetAllItems return all items (password|bookmark|cookie|history)
+	// GetAllItems return all items (password|Bookmark|Cookie|History)
 	GetAllItems() ([]data.Item, error)
 
-	// GetItem return single one from the password|bookmark|cookie|history
+	// GetItem return single one from the password|Bookmark|Cookie|History
 	GetItem(itemName string) (data.Item, error)
 }
 
 const (
-	cookie     = "cookie"
-	history    = "history"
-	bookmark   = "bookmark"
+	Cookie     = "cookie"
+	History    = "history"
+	Bookmark   = "bookmark"
 	download   = "download"
 	password   = "password"
 	creditcard = "creditcard"
 )
 
 var (
-	errItemNotSupported    = errors.New(`item not supported, default is "all", choose from history|download|password|bookmark|cookie`)
+	errItemNotSupported    = errors.New(`item not supported, default is "all", choose from History|download|password|Bookmark|Cookie`)
 	errBrowserNotSupported = errors.New("browser not supported")
 	errChromeSecretIsEmpty = errors.New("chrome secret is empty")
 	errDbusSecretIsEmpty   = errors.New("dbus secret key is empty")
@@ -67,15 +67,15 @@ var (
 		mainFile string
 		newItem  func(mainFile, subFile string) data.Item
 	}{
-		bookmark: {
+		Bookmark: {
 			mainFile: data.ChromeBookmarkFile,
 			newItem:  data.NewBookmarks,
 		},
-		cookie: {
+		Cookie: {
 			mainFile: data.ChromeCookieFile,
 			newItem:  data.NewCookies,
 		},
-		history: {
+		History: {
 			mainFile: data.ChromeHistoryFile,
 			newItem:  data.NewHistoryData,
 		},
@@ -97,15 +97,15 @@ var (
 		subFile  string
 		newItem  func(mainFile, subFile string) data.Item
 	}{
-		bookmark: {
+		Bookmark: {
 			mainFile: data.FirefoxDataFile,
 			newItem:  data.NewBookmarks,
 		},
-		cookie: {
+		Cookie: {
 			mainFile: data.FirefoxCookieFile,
 			newItem:  data.NewCookies,
 		},
-		history: {
+		History: {
 			mainFile: data.FirefoxDataFile,
 			newItem:  data.NewHistoryData,
 		},
@@ -153,7 +153,7 @@ func (c *Chromium) GetAllItems() ([]data.Item, error) {
 			continue
 		}
 		i := choice.newItem(m, "")
-		log.Debugf("%s find %s File Success", c.name, item)
+		//log.Debugf("%s find %s File Success", c.name, item)
 		items = append(items, i)
 	}
 	return items, nil

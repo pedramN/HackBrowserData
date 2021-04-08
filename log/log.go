@@ -37,6 +37,10 @@ func InitLog(l string) {
 	formatLogger = newLog(os.Stdout).setLevel(levelMap[l]).setFlags(log.Lshortfile)
 }
 
+func init(){
+	InitLog("error")
+}
+
 type Logger struct {
 	level Level
 	l     *log.Logger
