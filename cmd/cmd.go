@@ -1,9 +1,10 @@
 package cmd
 
 import (
-	"hack-browser-data/core"
-	"hack-browser-data/log"
-	"hack-browser-data/utils"
+	"github.com/pedramN/HackBrowserData/core"
+	"github.com/pedramN/HackBrowserData/log"
+	"github.com/pedramN/HackBrowserData/utils"
+
 	"os"
 	"strings"
 

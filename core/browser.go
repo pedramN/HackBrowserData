@@ -7,8 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"hack-browser-data/core/data"
-	"hack-browser-data/log"
+	"github.com/pedramN/HackBrowserData/core/data"
+	"github.com/pedramN/HackBrowserData/log"
+
 )
 
 const (

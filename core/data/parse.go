@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/base64"
-	"fmt"
+
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,10 +13,10 @@ import (
 	"time"
 
 
+	"github.com/pedramN/HackBrowserData/core/decrypt"
+	"github.com/pedramN/HackBrowserData/log"
+	"github.com/pedramN/HackBrowserData/utils"
 
-	"hack-browser-data/core/decrypt"
-	"hack-browser-data/log"
-	"hack-browser-data/utils"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/tidwall/gjson"
@@ -973,7 +973,6 @@ type (
 )
 
 func (p passwords) Len() int {
-	fmt.Println("Hello World")
 	return len(p.logins)
 }
 
